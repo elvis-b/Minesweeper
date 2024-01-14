@@ -1,0 +1,234 @@
+type: edu
+files:
+  - name: src/minesweeper/Main.java
+    visible: true
+    text: |
+      package minesweeper;
+      
+      public class Main {
+          public static void main(String[] args) {
+              // write your code here
+          }
+      }
+    learner_created: false
+  - name: test/MinesweeperTest.java
+    visible: false
+    text: |
+      import org.hyperskill.hstest.stage.StageTest;
+      import org.hyperskill.hstest.testcase.CheckResult;
+      import org.hyperskill.hstest.testcase.TestCase;
+      import org.hyperskill.hstest.testing.TestedProgram;
+      
+      import java.util.*;
+      import java.util.stream.Collectors;
+      
+      public class MinesweeperTest extends StageTest<Integer> {
+          @Override
+          public List<TestCase<Integer>> generate() {
+              List<TestCase<Integer>> tests = new ArrayList<>();
+              for (int i = 1; i <= 50; i++) {
+                  int mines = i;
+                  TestCase<Integer> test = new TestCase<Integer>()
+                      .setDynamicTesting(() -> {
+                          TestedProgram main = new TestedProgram();
+                          main.start();
+                          String output = main.execute("" + mines);
+                          return test(output, mines);
+                      });
+                  tests.add(test);
+                  tests.add(test);
+              }
+              return tests;
+          }
+      
+          public CheckResult test(String reply, Integer attach) {
+              List<String> lines =
+                  Arrays.stream(reply.split("\n"))
+                      .map(String::trim)
+                      .collect(Collectors.toList());
+      
+              if (lines.isEmpty()) {
+                  return CheckResult.wrong(
+                      "Looks like you didn't output a single line!"
+                  );
+              }
+      
+              if (lines.size() != 9) {
+                  return CheckResult.wrong(
+                      "You should output exactly 9 lines of the field. Found: " + lines.size() + "."
+                  );
+              }
+      
+              int mines = 0;
+      
+              for (String line : lines) {
+                  if (line.length() != 9) {
+                      return CheckResult.wrong(
+                          "One of the lines of the field doesn't have 9 symbols, " +
+                              "but has " + line.length() + ".\n" +
+                              "This line is \"" + line + "\""
+                      );
+                  }
+      
+                  for (char c : line.toCharArray()) {
+                      if (c != 'X' && c != '.' && !(c >= '0' && c <= '9')) {
+                          return CheckResult.wrong(
+                              "One of the characters is not equal to 'X' or '.' or to a number.\n" +
+                                  "In this line: \"" + line + "\"."
+                          );
+                      }
+                      if (c == 'X') {
+                          mines++;
+                      }
+                  }
+              }
+      
+              if (attach != mines) {
+                  return CheckResult.wrong(
+                      "Expected to see " + attach + " mines, found " + mines
+                  );
+              }
+      
+              int[] around = new int[] {-1, 0, 1};
+      
+              for (int y = 0; y < lines.size(); y++) {
+                  String line = lines.get(y);
+                  for (int x = 0; x < line.length(); x++) {
+                      char c = line.charAt(x);
+      
+                      if (c == 'X') {
+                          continue;
+                      }
+      
+                      int minesAround = 0;
+      
+                      for (int dx : around) {
+                          for (int dy : around) {
+      
+                              int newX = x + dx;
+                              int newY = y + dy;
+      
+                              if (0 <= newX && newX < 9 &&
+                                  0 <= newY && newY < 9) {
+      
+                                  char newC = lines.get(newY).charAt(newX);
+      
+                                  if (newC == 'X') {
+                                      minesAround++;
+                                  }
+                              }
+                          }
+                      }
+      
+                      if (minesAround == 0 && c != '.') {
+                          return CheckResult.wrong(
+                              "There are no mines around, but found number " + c + ".\n" +
+                                  "In line " + (y+1) + ", symbol " + (x+1) + "."
+                          );
+                      }
+      
+                      if (minesAround != 0 && c != '0' + minesAround) {
+                          return CheckResult.wrong(
+                              "In this cell should be number " + minesAround + ", " +
+                                  "but found symbol \"" + c + "\".\n" +
+                                  "In line " + (y+1) + ", symbol " + (x+1) + "."
+                          );
+                      }
+      
+                  }
+              }
+      
+              return CheckResult.correct();
+          }
+      }
+    learner_created: false
+  - name: src/minesweeper/Board.java
+    visible: true
+    text: |
+      package minesweeper;
+      
+      import java.util.Random;
+      
+      public class Board {
+      
+          private static final char BOMB = 'X';
+          private static final char SAFE_CELL = '.';
+      
+          private char[][] field;
+      
+          public Board(int size, int numMines) {
+              field = generateMinefield(size, numMines);
+              calculateMinesAroundCells(size);
+          }
+      
+          private  char[][] generateMinefield(int size, int numMines) {
+              Random random = new Random();
+              char[][] newField = new char[size][size];
+      
+              for (int i = 0; i < size; i++) {
+                  for (int j = 0; j < size; j++) {
+                      newField[i][j] = SAFE_CELL;
+                  }
+              }
+      
+              // Randomly assign bombs to the field
+              for (int i = 0; i < numMines; i++) {
+                  int bombRow = random.nextInt(size);
+                  int bombCol = random.nextInt(size);
+      
+                  // Ensure not placing a bomb in the same cell
+                  while (newField[bombRow][bombCol] == BOMB) {
+                      bombRow = random.nextInt(size);
+                      bombCol = random.nextInt(size);
+                  }
+      
+                  newField[bombRow][bombCol] = BOMB;
+              }
+      
+              return newField;
+          }
+      
+      
+          private void calculateMinesAroundCells(int size) {
+              for (int i = 0; i < size; i++) {
+                  for (int j = 0; j < size; j++) {
+                      if (field[i][j] == SAFE_CELL) {
+                          int minesNear = countMinesNear(i, j, size);
+                          field[i][j] = minesNear > 0 ? (char) ('0' + minesNear) : SAFE_CELL; // Convert integer to char
+                      }
+                  }
+              }
+          }
+      
+          private int countMinesNear(int i, int j, int size) {
+              int mines = 0;
+      
+              for (int x = -1; x <= 1; x++) {
+                  for (int y = -1; y <= 1; y++) {
+                      if (x + i >= 0 && x + i < size && y + j >= 0 && y + j < size) {
+                          if (field[x + i][y + j] == BOMB) {
+                              mines++;
+                          }
+                      }
+                  }
+              }
+      
+              return mines;
+          }
+      
+          public void printBoard() {
+              for (int i = 0; i < field.length; i++) {
+                  for (int j = 0; j < field[i].length; j++) {
+                      System.out.print(field[i][j]);
+                  }
+                  System.out.println();
+              }
+          }
+      }
+    learner_created: true
+feedback_link: https://hyperskill.org/learn/step/7202#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: "Fri, 05 Jan 2024 12:16:06 UTC"
+record: 3
